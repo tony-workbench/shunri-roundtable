@@ -1,0 +1,55 @@
+{
+  "run_user": "shunri",
+  "home": "/home/shunri",
+  "node_bin": "/usr/local/nvm/versions/node/v24.0.0/bin",
+  "adal": ".adal/versions/1.10.2/adal",
+  "kylon_bundle": ".local/opt/kylon/0.7.9/package/dist/kylon-bundle.mjs",
+  "kylon": {
+    "agent": "your-kylon-agent-id",
+    "room": "your-kylon-room-id",
+    "workspace": "your-kylon-workspace-id"
+  },
+  "repo": "your-account/conductor-playground",
+  "pr_number": 1,
+  "pr_branch": "shunri/roundtable",
+  "commit_name": "Your Name (Shunri v3 roundtable)",
+  "commit_email": "you@example.com",
+  "n8n": {
+    "workflow_id": "your-workflow-id",
+    "version_id": "your-version-id",
+    "credential_id": "your-celesto-credential-id",
+    "credential_name": "Celesto",
+    "machines": [
+      "cmp_coordinator",
+      "cmp_machine2",
+      "cmp_machine3",
+      "cmp_machine4"
+    ]
+  },
+  "project": {
+    "name": "Shunri",
+    "slug": "shunri-v3",
+    "state_root": "/var/lib/shunri-v3",
+    "direction_path": "docs/PRODUCT-DIRECTION.md",
+    "queue_prefix": "S",
+    "protected_paths": [
+      "docs/PRODUCT-DIRECTION.md",
+      "AGENTS.md",
+      ".gitignore"
+    ],
+    "seat_readonly_files": [
+      "server.mjs",
+      "calendar-service.mjs",
+      "package.json",
+      "scripts/",
+      "assets/"
+    ],
+    "entry_file": "app/server.mjs",
+    "test_command": "node --test",
+    "prelint_project": "Shunri",
+    "product_description": "Shunri scheduling app",
+    "queue_last": 8,
+    "guard_extra_patterns": [],
+    "guard_allowed_emails": []
+  }
+}

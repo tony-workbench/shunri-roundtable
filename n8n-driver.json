@@ -1,0 +1,298 @@
+{
+ "name": "{{LABEL}} — driver (supervise, attest, start/stop; every 5 min)",
+ "id": "{{WORKFLOW_ID}}",
+ "versionId": "{{VERSION_ID}}",
+ "activeVersionId": "{{VERSION_ID}}",
+ "settings": {
+  "executionOrder": "v1",
+  "availableInMCP": true
+ },
+ "nodes": [
+  {
+   "name": "Every 5 minutes",
+   "id": "13ddfaca-2192-48e6-84da-89d777e074b4",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    0,
+    0
+   ],
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "minutes",
+       "minutesInterval": 5
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Build info",
+   "id": "b1f0a001-0000-4000-8000-000000000001",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    220,
+    0
+   ],
+   "parameters": {
+    "jsCode": "return [{json:{rpc:{jsonrpc:'2.0',id:'call',method:'tools/call',params:{name:'cloud_computer_info',arguments:{name:'{{MACHINE_1}}'}}}}}];"
+   }
+  },
+  {
+   "name": "Info",
+   "id": "b1f0a001-0000-4000-8000-000000000002",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    440,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://mcp.celesto.ai/mcp",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Accept",
+       "value": "application/json, text/event-stream"
+      },
+      {
+       "name": "MCP-Protocol-Version",
+       "value": "2025-06-18"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json.rpc) }}",
+    "options": {
+     "response": {
+      "response": {
+       "fullResponse": true,
+       "neverError": true,
+       "responseFormat": "text",
+       "outputPropertyName": "body"
+      }
+     },
+     "timeout": 90000
+    }
+   },
+   "credentials": {
+    "httpHeaderAuth": {
+     "id": "{{CREDENTIAL_ID}}",
+     "name": "{{CREDENTIAL_NAME}}"
+    }
+   }
+  },
+  {
+   "name": "Decide",
+   "id": "b1f0a001-0000-4000-8000-000000000003",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    660,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// {{LABEL}} driver: fully automatic runs with error fallbacks. One tick every 5 minutes:\n// machine running -> supervise (keeps an active run going; restarts the driver and the Kylon gateway after crashes or reboots)\n// + n8n attestation + hosting watchdog. Machine stopped -> start it only while a run it saw running has not finished.\nconst sd = $getWorkflowStaticData('global');\nconst r = $input.first().json; let status = 'unknown';\ntry { const v = JSON.parse(r.body); const res = v.result || {}; const sc = res.structuredContent || JSON.parse(((res.content||[]).find(x=>x.type==='text')||{}).text||'{}'); status = sc.status || 'unknown'; } catch(e) { status = 'parse_error'; }\nconst call = (name, args) => ({jsonrpc:'2.0', id:'call', method:'tools/call', params:{name, arguments:args}});\nif (status === 'stopped') {\n  if (!sd.activeRun || sd.activeRun === sd.finishedRun) return [];   // idle or finished: stay off\n  return [{json:{action:'start', status, run: sd.activeRun, rpc: call('cloud_computer_start', {name:'{{MACHINE_1}}'})}}];\n}\nif (status !== 'running') return [];   // starting, stopping, unknown: act on the next tick\nconst R = 'python3 /opt/{{SLUG}}/round.py';\nconst cmd = 'cd / && ' + R + ' supervise; ' + R + ' n8n-attest --execution ' + $execution.id + ' --workflow ' + $workflow.id + '; ' + R + ' watch';\nreturn [{json:{action:'exec', status, rpc: call('cloud_computer_exec', {name:'{{MACHINE_1}}', command:cmd, timeout:150})}}];"
+   }
+  },
+  {
+   "name": "Act",
+   "id": "b1f0a001-0000-4000-8000-000000000004",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    880,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://mcp.celesto.ai/mcp",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Accept",
+       "value": "application/json, text/event-stream"
+      },
+      {
+       "name": "MCP-Protocol-Version",
+       "value": "2025-06-18"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json.rpc) }}",
+    "options": {
+     "response": {
+      "response": {
+       "fullResponse": true,
+       "neverError": true,
+       "responseFormat": "text",
+       "outputPropertyName": "body"
+      }
+     },
+     "timeout": 90000
+    }
+   },
+   "credentials": {
+    "httpHeaderAuth": {
+     "id": "{{CREDENTIAL_ID}}",
+     "name": "{{CREDENTIAL_NAME}}"
+    }
+   }
+  },
+  {
+   "name": "After",
+   "id": "b1f0a001-0000-4000-8000-000000000005",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1100,
+    0
+   ],
+   "parameters": {
+    "jsCode": "// After supervise: remember the active run; when it finishes, stop all four machines once.\nconst sd = $getWorkflowStaticData('global');\nconst d = $('Decide').first().json; if (d.action !== 'exec') return [];\nconst body = $input.first().json.body; let text = String(body || '');\ntry { const v = JSON.parse(body); const res = v.result || {}; const sc = res.structuredContent; text = sc ? (typeof sc.stdout === 'string' ? sc.stdout : JSON.stringify(sc)) : (res.content||[]).map(x=>x.text).join('\\n'); } catch(e) {}\ntry { const inner = JSON.parse(text); if (inner && typeof inner.stdout === 'string') text = inner.stdout; } catch(e) {}   // Celesto wraps stdout in a JSON text\nlet sup = null;\nfor (const line of text.split('\\n')) { const t = line.trim(); if (t.startsWith('{\"run\"')) { try { sup = JSON.parse(t); break; } catch(e) {} } }\nif (!sup) return [];\nif (sup.run === 'running') { sd.activeRun = sup.id; return []; }\nif (sup.run !== 'finished' || sd.finishedRun === sup.id) return [];\nsd.finishedRun = sup.id; sd.activeRun = sup.id;\nconst stop = (name) => ({jsonrpc:'2.0', id:'call', method:'tools/call', params:{name:'cloud_computer_stop', arguments:{name}}});\nreturn ['{{MACHINE_1}}','{{MACHINE_2}}','{{MACHINE_3}}','{{MACHINE_4}}'].map(n => ({json:{machine:n, rpc: stop(n)}}));"
+   }
+  },
+  {
+   "name": "Stop machines",
+   "id": "b1f0a001-0000-4000-8000-000000000006",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    1320,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://mcp.celesto.ai/mcp",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Content-Type",
+       "value": "application/json"
+      },
+      {
+       "name": "Accept",
+       "value": "application/json, text/event-stream"
+      },
+      {
+       "name": "MCP-Protocol-Version",
+       "value": "2025-06-18"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json.rpc) }}",
+    "options": {
+     "response": {
+      "response": {
+       "fullResponse": true,
+       "neverError": true,
+       "responseFormat": "text",
+       "outputPropertyName": "body"
+      }
+     },
+     "timeout": 90000
+    }
+   },
+   "credentials": {
+    "httpHeaderAuth": {
+     "id": "{{CREDENTIAL_ID}}",
+     "name": "{{CREDENTIAL_NAME}}"
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Every 5 minutes": {
+   "main": [
+    [
+     {
+      "node": "Build info",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build info": {
+   "main": [
+    [
+     {
+      "node": "Info",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Info": {
+   "main": [
+    [
+     {
+      "node": "Decide",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Decide": {
+   "main": [
+    [
+     {
+      "node": "Act",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Act": {
+   "main": [
+    [
+     {
+      "node": "After",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "After": {
+   "main": [
+    [
+     {
+      "node": "Stop machines",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ }
+}
